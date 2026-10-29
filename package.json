@@ -1,0 +1,13 @@
+{
+  "name": "chickens-in-hats-relay",
+  "version": "1.0.0",
+  "description": "Room server for Chickens in Hats online play",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
