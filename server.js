@@ -15,7 +15,7 @@ const crypto = require("crypto");
 
 const PORT = process.env.PORT || 8080;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-const MAX_PLAYERS = 4;
+const MAX_PLAYERS = 6;       // salas de 4 o de 6 pollos (lo elige el que crea la sala)
 const MAX_MESSAGE = 256 * 1024;
 
 const rooms = new Map(); // código -> { host, peers: Map(id -> conn) }
@@ -123,18 +123,19 @@ class Conn {
       let code;
       do { code = Array.from({ length: 5 }, () => CODE_CHARS[crypto.randomInt(CODE_CHARS.length)]).join(""); }
       while (rooms.has(code));
-      const room = { code, host: this, peers: new Map([[1, this]]), open: true };
+      const max = Math.max(2, Math.min(MAX_PLAYERS, Number(msg.max) || 4));
+      const room = { code, host: this, peers: new Map([[1, this]]), open: true, max };
       rooms.set(code, room);
       this.room = room;
       this.id = 1;
       this.sendJSON({ op: "created", code, id: 1 });
-      log(`room ${code} created`);
+      log(`room ${code} created (${max} chickens)`);
     } else if (msg.op === "join" && !this.room) {
       const code = String(msg.code || "").toUpperCase().replace(/[^A-Z]/g, "");
       const room = rooms.get(code);
       if (!room) return this.sendJSON({ op: "error", msg: "No room with that code." });
       if (!room.open) return this.sendJSON({ op: "error", msg: "That room is already playing. Try again in a moment!" });
-      if (room.peers.size >= MAX_PLAYERS) return this.sendJSON({ op: "error", msg: "That room is full." });
+      if (room.peers.size >= room.max) return this.sendJSON({ op: "error", msg: "That room is full." });
       let id;
       do { id = 2 + crypto.randomInt(2 ** 30); } while (room.peers.has(id));
       room.peers.set(id, this);
@@ -142,7 +143,7 @@ class Conn {
       this.id = id;
       this.sendJSON({ op: "joined", code, id });
       room.host.sendJSON({ op: "peer_join", id });
-      log(`room ${code}: player joined (${room.peers.size}/${MAX_PLAYERS})`);
+      log(`room ${code}: player joined (${room.peers.size}/${room.max})`);
     } else if (msg.op === "open" && this.room && this.id === 1) {
       this.room.open = !!msg.value;            // el host avisa si se puede entrar (sala de espera) o no (jugando)
     } else if (msg.op === "kick" && this.room && this.id === 1) {
